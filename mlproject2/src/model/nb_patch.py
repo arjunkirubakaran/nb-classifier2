@@ -1,5 +1,4 @@
 """
-StudentMultinomialNB - Multinomial Naive Bayes with scikit-like attribute aliases.
 This class trains on token lists and sets attributes main.py expects:
  - vocab_ (set of tokens)
  - classes_ (sorted list of class labels)
