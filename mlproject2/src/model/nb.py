@@ -1,11 +1,11 @@
-# Student's independent implementation — inspired by assignment
+
 
 import math
 from collections import Counter
 from typing import Dict, List
 
 class StudentMultinomialNB:
-    """A minimal, from-scratch Multinomial Naive Bayes for text classification."""
+    """Multinomial Naive Bayes for text classification."""
     def __init__(self, alpha: float = 1.0):
         self.alpha = alpha
         self.classes_: List[str] = []
