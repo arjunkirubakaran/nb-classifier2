@@ -1,0 +1,81 @@
+"""
+StudentMultinomialNB - a small, robust Multinomial Naive Bayes implementation.
+Self-contained replacement for the buggy nb implementation.
+"""
+from collections import Counter
+import math
+from typing import List, Dict
+
+class StudentMultinomialNB:
+    def __init__(self, alpha: float = 1.0):
+        self.alpha = float(alpha)
+        self.class_list: List[str] = []
+        self.prior_log: Dict[str, float] = {}
+        self.vocab = set()
+        self.class_word_counts = {}   # class -> Counter(word -> count)
+        self.class_total_words = {}   # class -> integer total words
+        self.vocab_size = 0
+        self.unseen_logprob_cache = {}  # cache for class unseen token logprob
+        self.token_logprob = {}
+
+    def train(self, docs: List[List[str]], labels: List[str]) -> None:
+        """Train on tokenized docs (list of tokens per doc) and corresponding string labels."""
+        if len(docs) != len(labels):
+            raise ValueError("docs and labels must have same length")
+        # Determine classes
+        self.class_list = sorted(set(labels))
+        # Initialize counts
+        self.class_word_counts = {c: Counter() for c in self.class_list}
+        class_doc_counts = Counter(labels)
+        n_docs = len(labels)
+
+        # Build vocabulary and per-class word counts
+        for toks, lab in zip(docs, labels):
+            if lab not in self.class_word_counts:
+                # safety: initialize if unseen label appears
+                self.class_word_counts[lab] = Counter()
+            self.class_word_counts[lab].update(toks)
+            for t in toks:
+                self.vocab.add(t)
+
+        # Totals
+        self.class_total_words = {c: sum(self.class_word_counts[c].values()) for c in self.class_list}
+        self.vocab_size = len(self.vocab)
+
+        # Priors (use class doc counts)
+        self.prior_log = {c: math.log((class_doc_counts[c] / n_docs)) for c in self.class_list}
+
+        # Precompute token log-probs per class (store as dicts)
+        self.token_logprob = {}
+        for c in self.class_list:
+            total = self.class_total_words.get(c, 0)
+            denom = total + self.alpha * max(1, self.vocab_size)
+            base_unseen = math.log(self.alpha / denom) if denom > 0 else math.log(1e-12)
+            self.unseen_logprob_cache[c] = base_unseen
+            cnts = self.class_word_counts[c]
+            d = {}
+            for token, cnt in cnts.items():
+                d[token] = math.log((cnt + self.alpha) / denom)
+            self.token_logprob[c] = d
+
+    def infer(self, docs: List[List[str]]) -> List[str]:
+        """Return predicted labels for list of token lists."""
+        preds = []
+        for toks in docs:
+            best_label = None
+            best_score = None
+            for c in self.class_list:
+                score = self.prior_log.get(c, float('-inf'))
+                token_log = self.token_logprob.get(c, {})
+                unseen = self.unseen_logprob_cache.get(c, math.log(1e-12))
+                for t in toks:
+                    score += token_log.get(t, unseen)
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best_label = c
+            preds.append(best_label if best_label is not None else (self.class_list[0] if self.class_list else None))
+        return preds
+
+    # convenience aliases expected by some callers
+    def predict(self, docs: List[List[str]]) -> List[str]:
+        return self.infer(docs)
